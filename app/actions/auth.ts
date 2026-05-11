@@ -4,6 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+function getSafeRedirectPath(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") {
+    return "/dashboard";
+  }
+
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return value;
+}
+
 // ─── Sign Up ────────────────────────────────────────────────────────────────
 
 export async function signUp(
@@ -58,6 +70,7 @@ export async function signIn(
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const nextPath = getSafeRedirectPath(formData.get("next"));
 
   if (!email || !password) {
     return { error: "Email and password are required." };
@@ -74,7 +87,7 @@ export async function signIn(
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(nextPath);
 }
 
 // ─── Sign Out ───────────────────────────────────────────────────────────────
