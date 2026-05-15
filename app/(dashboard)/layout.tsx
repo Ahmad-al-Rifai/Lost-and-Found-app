@@ -54,7 +54,7 @@ export default async function DashboardLayout({
               {profile?.full_name ?? user.email}
             </span>
             <Button variant="outline" size="sm" asChild>
-              <a href="#report-item">Report item</a>
+              <Link href="/dashboard/report">Report item</Link>
             </Button>
             <form action={signOut}>
               <Button type="submit" variant="ghost" size="sm">

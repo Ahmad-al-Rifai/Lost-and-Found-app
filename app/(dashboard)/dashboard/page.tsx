@@ -8,6 +8,7 @@ import {
   Plus,
   ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -352,9 +353,11 @@ export default async function DashboardPage({
           </p>
         </div>
 
-        <Button id="report-item" className="h-11 w-full gap-2 lg:w-auto">
-          <Plus weight="bold" />
-          Report item
+        <Button id="report-item" className="h-11 w-full gap-2 lg:w-auto" asChild>
+          <Link href="/dashboard/report">
+            <Plus weight="bold" />
+            Report item
+          </Link>
         </Button>
       </section>
 
