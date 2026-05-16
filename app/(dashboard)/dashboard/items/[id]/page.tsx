@@ -10,6 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { ClaimForm } from "./claim-form";
 
 type LookupRelation = { name: string | null } | { name: string | null }[] | null;
 
@@ -164,7 +165,7 @@ export default async function ItemDetailPage({
   const itemType = item.item_type ?? "lost";
   const title = item.title ?? "Untitled item";
   const images = getSortedImages(item.item_images);
-  const actionLabel = itemType === "found" ? "Claim item" : "Contact finder";
+  const isFoundItem = itemType === "found";
 
   return (
     <div className="space-y-6">
@@ -195,9 +196,15 @@ export default async function ItemDetailPage({
           </p>
         </div>
 
-        <Button className="h-11" disabled>
-          {actionLabel}
-        </Button>
+        {isFoundItem ? (
+          <Button className="h-11" asChild>
+            <a href="#claim-item">Claim item</a>
+          </Button>
+        ) : (
+          <Button className="h-11" disabled>
+            Contact finder
+          </Button>
+        )}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -301,13 +308,17 @@ export default async function ItemDetailPage({
             </div>
           </div>
 
-          <div className="border border-amber-700/20 bg-amber-50 p-4 text-amber-900">
-            <h2 className="text-lg font-semibold">Claim flow coming next</h2>
-            <p className="mt-2 text-sm">
-              {actionLabel} is disabled for now. Claims and contact messages
-              will be added in a later sprint.
-            </p>
-          </div>
+          {isFoundItem ? (
+            <ClaimForm itemId={item.id} />
+          ) : (
+            <div className="border border-amber-700/20 bg-amber-50 p-4 text-amber-900">
+              <h2 className="text-lg font-semibold">Contact unavailable</h2>
+              <p className="mt-2 text-sm">
+                Contact messages are not part of this sprint. Claims are only
+                available for found items.
+              </p>
+            </div>
+          )}
 
           <div className="border border-green-700/20 bg-green-50 p-4 text-green-900">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
