@@ -44,8 +44,7 @@ export default async function DashboardLayout({
               <Link href="/dashboard" className="text-foreground">
                 Browse
               </Link>
-              <a href="#reports">Reports</a>
-              <a href="#matches">Matches</a>
+              <Link href="/dashboard/activity">My Activity</Link>
             </nav>
           </div>
 
