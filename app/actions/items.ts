@@ -14,6 +14,11 @@ export type CreateClaimState =
   | { success: string; error?: never }
   | null;
 
+export type ReviewClaimState =
+  | { error: string; success?: never }
+  | { success: string; error?: never }
+  | null;
+
 function getRequiredString(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -201,4 +206,133 @@ export async function createClaim(
 
   revalidatePath(`/dashboard/items/${itemId}`);
   return { success: "Claim submitted for review." };
+}
+
+async function getReporterClaimContext(claimId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: "You must be signed in to review claims." };
+  }
+
+  if (!claimId || !isValidUuid(claimId)) {
+    return { error: "This claim could not be found." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return { error: "Your profile could not be found. Try signing in again." };
+  }
+
+  const { data: claim, error: claimError } = await supabase
+    .from("claims")
+    .select("id, item_id, claim_status")
+    .eq("id", claimId)
+    .single();
+
+  if (claimError || !claim?.item_id || !isValidUuid(claim.item_id)) {
+    return { error: "This claim could not be found." };
+  }
+
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .select("id, reported_by")
+    .eq("id", claim.item_id)
+    .single();
+
+  if (itemError || !item) {
+    return { error: "The claimed item could not be found." };
+  }
+
+  if (item.reported_by !== profile.id) {
+    return { error: "Only the item reporter can review this claim." };
+  }
+
+  if (claim.claim_status !== "pending") {
+    return { error: "Only pending claims can be changed." };
+  }
+
+  return { supabase, claim, item };
+}
+
+export async function approveClaim(
+  _prevState: ReviewClaimState,
+  formData: FormData
+): Promise<ReviewClaimState> {
+  const claimId = getRequiredString(formData, "claim_id");
+  const context = await getReporterClaimContext(claimId);
+
+  if ("error" in context) {
+    return { error: context.error ?? "Claim review failed." };
+  }
+
+  const { supabase, claim, item } = context;
+
+  const { error: approveError } = await supabase
+    .from("claims")
+    .update({ claim_status: "approved" })
+    .eq("id", claim.id);
+
+  if (approveError) {
+    return { error: approveError.message };
+  }
+
+  const { error: rejectOthersError } = await supabase
+    .from("claims")
+    .update({ claim_status: "rejected" })
+    .eq("item_id", item.id)
+    .eq("claim_status", "pending")
+    .neq("id", claim.id);
+
+  if (rejectOthersError) {
+    return { error: rejectOthersError.message };
+  }
+
+  const { error: itemUpdateError } = await supabase
+    .from("items")
+    .update({ status: "claimed" })
+    .eq("id", item.id);
+
+  if (itemUpdateError) {
+    return { error: itemUpdateError.message };
+  }
+
+  revalidatePath(`/dashboard/items/${item.id}`);
+  return { success: "Claim approved." };
+}
+
+export async function rejectClaim(
+  _prevState: ReviewClaimState,
+  formData: FormData
+): Promise<ReviewClaimState> {
+  const claimId = getRequiredString(formData, "claim_id");
+  const context = await getReporterClaimContext(claimId);
+
+  if ("error" in context) {
+    return { error: context.error ?? "Claim review failed." };
+  }
+
+  const { supabase, claim, item } = context;
+
+  const { error: rejectError } = await supabase
+    .from("claims")
+    .update({ claim_status: "rejected" })
+    .eq("id", claim.id);
+
+  if (rejectError) {
+    return { error: rejectError.message };
+  }
+
+  revalidatePath(`/dashboard/items/${item.id}`);
+  return { success: "Claim rejected." };
 }

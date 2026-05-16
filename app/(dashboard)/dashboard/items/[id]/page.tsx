@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { ClaimForm } from "./claim-form";
+import { ClaimReviewActions } from "./claim-review-actions";
 
 type LookupRelation = { name: string | null } | { name: string | null }[] | null;
 
@@ -36,6 +37,20 @@ type DetailItem = {
   item_images: ItemImage[] | null;
 };
 
+type ItemClaim = {
+  id: string;
+  item_id: string | null;
+  claimant_id: string | null;
+  claim_status: "pending" | "approved" | "rejected" | string | null;
+  verification_answer: string | null;
+  created_at: string | null;
+};
+
+type ClaimantProfile = {
+  id: string;
+  full_name: string | null;
+};
+
 const statusStyles = {
   open: "border-blue-700/20 bg-blue-50 text-blue-800",
   claimed: "border-amber-700/20 bg-amber-50 text-amber-800",
@@ -51,6 +66,18 @@ const statusLabels: Record<string, string> = {
 const itemTypeLabels: Record<string, string> = {
   lost: "Lost",
   found: "Found",
+};
+
+const claimStatusLabels: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
+const claimStatusStyles = {
+  pending: "border-amber-700/20 bg-amber-50 text-amber-800",
+  approved: "border-green-700/20 bg-green-50 text-green-800",
+  rejected: "border-destructive/30 bg-destructive/10 text-destructive",
 };
 
 function isValidUuid(value: string) {
@@ -113,6 +140,21 @@ function getSortedImages(images: ItemImage[] | null) {
     });
 }
 
+function ClaimStatusPill({ status }: { status: string | null }) {
+  const value = status ?? "pending";
+
+  return (
+    <span
+      className={`border px-2 py-1 text-xs font-medium ${
+        claimStatusStyles[value as keyof typeof claimStatusStyles] ??
+        claimStatusStyles.pending
+      }`}
+    >
+      {claimStatusLabels[value] ?? value}
+    </span>
+  );
+}
+
 export default async function ItemDetailPage({
   params,
 }: {
@@ -158,6 +200,49 @@ export default async function ItemDetailPage({
         .eq("id", item.reported_by)
         .single()
     : { data: null };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: currentProfile } = user
+    ? await supabase
+        .from("profiles")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single()
+    : { data: null };
+  const isReporter = Boolean(
+    currentProfile?.id && item.reported_by === currentProfile.id
+  );
+  const claimsResult = isReporter
+    ? await supabase
+        .from("claims")
+        .select(
+          "id, item_id, claimant_id, claim_status, verification_answer, created_at"
+        )
+        .eq("item_id", item.id)
+        .order("created_at", { ascending: false })
+        .returns<ItemClaim[]>()
+    : { data: [] as ItemClaim[] };
+  const claims = claimsResult.data ?? [];
+  const claimantIds = Array.from(
+    new Set(
+      claims
+        .map((claim) => claim.claimant_id)
+        .filter((claimantId): claimantId is string => Boolean(claimantId))
+    )
+  );
+  const claimantProfilesResult =
+    isReporter && claimantIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", claimantIds)
+          .returns<ClaimantProfile[]>()
+      : { data: [] as ClaimantProfile[] };
+  const claimantProfilesById = new Map(
+    (claimantProfilesResult.data ?? []).map((profile) => [profile.id, profile])
+  );
 
   const categoryName = getRelationName(item.categories) ?? "Category pending";
   const locationName = getRelationName(item.locations) ?? "Location pending";
@@ -254,6 +339,84 @@ export default async function ItemDetailPage({
               {item.description ?? "No public description provided."}
             </p>
           </div>
+
+          {isReporter ? (
+            <section className="border border-border bg-card p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Claims for this item
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Review private verification details before approving a
+                    claim.
+                  </p>
+                </div>
+                <span className="border border-border bg-background px-2 py-1 text-xs font-medium text-foreground">
+                  {claims.length} claim{claims.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {claims.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {claims.map((claim) => {
+                    const claimant = claim.claimant_id
+                      ? claimantProfilesById.get(claim.claimant_id)
+                      : null;
+                    const claimantName =
+                      claimant?.full_name ?? "Claimant unavailable";
+                    const isPendingClaim = claim.claim_status === "pending";
+
+                    return (
+                      <article
+                        key={claim.id}
+                        className="border border-border bg-background p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-base font-semibold text-foreground">
+                              {claimantName}
+                            </h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Submitted {formatDateTime(claim.created_at)}
+                            </p>
+                          </div>
+                          <ClaimStatusPill status={claim.claim_status} />
+                        </div>
+
+                        <div className="mt-4 border border-border bg-card p-3">
+                          <p className="text-xs font-medium uppercase text-muted-foreground">
+                            Verification detail
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                            {claim.verification_answer ??
+                              "No verification detail provided."}
+                          </p>
+                        </div>
+
+                        {isPendingClaim ? (
+                          <ClaimReviewActions
+                            claimId={claim.id}
+                            claimantName={claimantName}
+                          />
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-4 border border-border bg-background p-5 text-center">
+                  <h3 className="text-base font-semibold text-foreground">
+                    No claims submitted yet
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                    Claims will appear here when students submit ownership
+                    details for this item.
+                  </p>
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
 
         <aside className="space-y-4">
