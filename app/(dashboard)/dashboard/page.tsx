@@ -572,7 +572,12 @@ export default async function DashboardPage({
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <h2 className="text-lg font-semibold text-foreground">
-                            {item.title ?? "Untitled item"}
+                            <Link
+                              href={`/dashboard/items/${item.id}`}
+                              className="underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                            >
+                              {item.title ?? "Untitled item"}
+                            </Link>
                           </h2>
                           <p className="text-sm text-muted-foreground">
                             {locationName} - {formatDate(item.date_lost_found)}
