@@ -46,6 +46,41 @@ function isValidUuid(value: string) {
   );
 }
 
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+const maxImageSize = 5 * 1024 * 1024;
+
+function getOptionalImage(formData: FormData) {
+  const value = formData.get("item_image");
+
+  if (!(value instanceof File) || value.size === 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function getSafeFileName(file: File) {
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  const fallbackExtension = extensionByType[file.type] ?? "jpg";
+  const rawName = file.name || `photo.${fallbackExtension}`;
+  const extension = rawName.includes(".")
+    ? rawName.split(".").pop()?.toLowerCase() || fallbackExtension
+    : fallbackExtension;
+  const baseName =
+    rawName
+      .replace(/\.[^.]+$/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "photo";
+
+  return `${baseName}.${extension}`;
+}
+
 export async function createItem(
   _prevState: CreateItemState,
   formData: FormData
@@ -67,6 +102,7 @@ export async function createItem(
   const locationId = getRequiredNumber(formData, "location_id");
   const dateLostFound = getRequiredString(formData, "date_lost_found");
   const description = getRequiredString(formData, "description");
+  const image = getOptionalImage(formData);
 
   if (!["lost", "found"].includes(itemType)) {
     return { error: "Choose whether the item was lost or found." };
@@ -92,6 +128,14 @@ export async function createItem(
     return { error: "Add a short public description." };
   }
 
+  if (image && !allowedImageTypes.includes(image.type)) {
+    return { error: "Upload a JPG, PNG, or WebP image." };
+  }
+
+  if (image && image.size > maxImageSize) {
+    return { error: "Upload an image smaller than 5 MB." };
+  }
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
@@ -102,19 +146,55 @@ export async function createItem(
     return { error: "Your profile could not be found. Try signing in again." };
   }
 
-  const { error: insertError } = await supabase.from("items").insert({
-    reported_by: profile.id,
-    category_id: categoryId,
-    location_id: locationId,
-    title,
-    description,
-    item_type: itemType,
-    date_lost_found: dateLostFound,
-    status: "open",
-  });
+  const { data: item, error: insertError } = await supabase
+    .from("items")
+    .insert({
+      reported_by: profile.id,
+      category_id: categoryId,
+      location_id: locationId,
+      title,
+      description,
+      item_type: itemType,
+      date_lost_found: dateLostFound,
+      status: "open",
+    })
+    .select("id")
+    .single();
 
-  if (insertError) {
-    return { error: insertError.message };
+  if (insertError || !item) {
+    return { error: insertError?.message ?? "The item could not be created." };
+  }
+
+  if (image) {
+    const objectPath = `${profile.id}/${item.id}/${Date.now()}-${getSafeFileName(
+      image
+    )}`;
+    const { error: uploadError } = await supabase.storage
+      .from("item-images")
+      .upload(objectPath, image, {
+        contentType: image.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return {
+        error: `The report was created, but the image could not be uploaded: ${uploadError.message}`,
+      };
+    }
+
+    const { error: imageInsertError } = await supabase
+      .from("item_images")
+      .insert({
+        item_id: item.id,
+        storage_path: objectPath,
+        is_primary: true,
+      });
+
+    if (imageInsertError) {
+      return {
+        error: `The report was created, but the image could not be attached: ${imageInsertError.message}`,
+      };
+    }
   }
 
   revalidatePath("/dashboard");

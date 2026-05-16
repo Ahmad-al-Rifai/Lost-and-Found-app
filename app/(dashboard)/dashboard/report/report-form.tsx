@@ -158,10 +158,27 @@ export function ReportForm({ categories, locations, today }: ReportFormProps) {
       </section>
 
       <section className="border border-green-700/20 bg-green-50 p-5 text-green-900">
+        <h2 className="text-xl font-semibold">Photo</h2>
+        <p className="mt-2 text-sm">
+          Add one optional JPG, PNG, or WebP photo up to 5 MB. Avoid showing
+          private identifying details.
+        </p>
+        <label className="mt-4 block space-y-2">
+          <span className="text-sm font-medium">Item photo</span>
+          <input
+            name="item_image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="block w-full border border-green-700/20 bg-background text-sm text-foreground file:mr-3 file:h-11 file:cursor-pointer file:border-0 file:bg-primary file:px-3 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/80"
+          />
+        </label>
+      </section>
+
+      <section className="border border-green-700/20 bg-green-50 p-5 text-green-900">
         <h2 className="text-xl font-semibold">Review and submit</h2>
         <p className="mt-2 text-sm">
-          Photos are not part of this sprint. You can add the report now and
-          attach images in a later update.
+          Check the public details before submitting. Private proof of
+          ownership should stay out of the report.
         </p>
       </section>
 
