@@ -28,9 +28,10 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, role")
     .eq("auth_user_id", user.id)
     .single();
+  const isAdmin = profile?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,6 +46,7 @@ export default async function DashboardLayout({
                 Browse
               </Link>
               <Link href="/dashboard/activity">My Activity</Link>
+              {isAdmin ? <Link href="/dashboard/admin">Admin</Link> : null}
             </nav>
             <Link
               href="/dashboard/activity"
@@ -52,6 +54,14 @@ export default async function DashboardLayout({
             >
               My Activity
             </Link>
+            {isAdmin ? (
+              <Link
+                href="/dashboard/admin"
+                className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden"
+              >
+                Admin
+              </Link>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
