@@ -28,11 +28,20 @@ export function ClaimReviewActions({
     initialState
   );
   const isPending = isApproving || isRejecting;
+  const approveMessage = `Approve claim from ${claimantName}? This will mark the item as claimed and reject other pending claims.`;
+  const rejectMessage = `Reject claim from ${claimantName}?`;
 
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row">
-        <form action={approveAction}>
+        <form
+          action={approveAction}
+          onSubmit={(event) => {
+            if (!window.confirm(approveMessage)) {
+              event.preventDefault();
+            }
+          }}
+        >
           <input type="hidden" name="claim_id" value={claimId} />
           <Button
             type="submit"
@@ -44,7 +53,14 @@ export function ClaimReviewActions({
           </Button>
         </form>
 
-        <form action={rejectAction}>
+        <form
+          action={rejectAction}
+          onSubmit={(event) => {
+            if (!window.confirm(rejectMessage)) {
+              event.preventDefault();
+            }
+          }}
+        >
           <input type="hidden" name="claim_id" value={claimId} />
           <Button
             type="submit"

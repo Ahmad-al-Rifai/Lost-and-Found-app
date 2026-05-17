@@ -193,14 +193,6 @@ export default async function ItemDetailPage({
     notFound();
   }
 
-  const { data: reporter } = item.reported_by
-    ? await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", item.reported_by)
-        .single()
-    : { data: null };
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -214,6 +206,14 @@ export default async function ItemDetailPage({
   const isReporter = Boolean(
     currentProfile?.id && item.reported_by === currentProfile.id
   );
+  const { data: reporter } =
+    item.reported_by && isReporter
+      ? await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", item.reported_by)
+          .single()
+      : { data: null };
   const claimsResult = isReporter
     ? await supabase
         .from("claims")
@@ -251,6 +251,7 @@ export default async function ItemDetailPage({
   const title = item.title ?? "Untitled item";
   const images = getSortedImages(item.item_images);
   const isFoundItem = itemType === "found";
+  const isClaimable = isFoundItem && status === "open" && !isReporter;
 
   return (
     <div className="space-y-6">
@@ -281,7 +282,7 @@ export default async function ItemDetailPage({
           </p>
         </div>
 
-        {isFoundItem ? (
+        {isClaimable ? (
           <Button className="h-11" asChild>
             <a href="#claim-item">Claim item</a>
           </Button>
@@ -457,22 +458,31 @@ export default async function ItemDetailPage({
                   {formatDateTime(item.created_at)}
                 </span>
               </p>
-              {reporter?.full_name ? (
+              {item.reported_by ? (
                 <p className="flex gap-2">
                   <UserCircle className="mt-0.5 size-4 shrink-0 text-primary" />
                   <span>
                     <span className="font-medium text-foreground">
                       Reporter:
                     </span>{" "}
-                    {reporter.full_name}
+                    {isReporter
+                      ? reporter?.full_name ?? "You"
+                      : "Reporter verified"}
                   </span>
                 </p>
               ) : null}
             </div>
           </div>
 
-          {isFoundItem ? (
+          {isClaimable ? (
             <ClaimForm itemId={item.id} />
+          ) : isFoundItem ? (
+            <div className="border border-amber-700/20 bg-amber-50 p-4 text-amber-900">
+              <h2 className="text-lg font-semibold">Claims unavailable</h2>
+              <p className="mt-2 text-sm">
+                This found item is not currently open for new claims.
+              </p>
+            </div>
           ) : (
             <div className="border border-amber-700/20 bg-amber-50 p-4 text-amber-900">
               <h2 className="text-lg font-semibold">Contact unavailable</h2>

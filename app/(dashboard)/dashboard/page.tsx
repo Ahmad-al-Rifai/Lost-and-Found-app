@@ -152,7 +152,6 @@ function getRelationName(relation: LookupRelation) {
 
 async function getBrowseData(params: SearchParams) {
   const supabase = await createClient();
-  const isDevelopment = process.env.NODE_ENV === "development";
 
   const search = getParam(params.q).trim();
   const category = getNumericParam(getParam(params.category));
@@ -244,50 +243,6 @@ async function getBrowseData(params: SearchParams) {
   }
 
   const itemsResult = await query.returns<BrowseItem[]>();
-
-  if (isDevelopment && categoriesResult.error) {
-    console.error(
-      "[Sprint 2A Browse] categoriesResult.error",
-      categoriesResult.error
-    );
-  }
-
-  if (isDevelopment && locationsResult.error) {
-    console.error(
-      "[Sprint 2A Browse] locationsResult.error",
-      locationsResult.error
-    );
-  }
-
-  if (isDevelopment && statsResult.error) {
-    console.error("[Sprint 2A Browse] statsResult.error", statsResult.error);
-  }
-
-  if (isDevelopment && itemsResult.error) {
-    console.error("[Sprint 2A Browse] itemsResult.error", itemsResult.error);
-  }
-
-  if (isDevelopment && itemsResult.data?.[0]) {
-    const sample = itemsResult.data[0];
-
-    console.log("[Sprint 2A Browse] sample item relation shape", {
-      id: sample.id,
-      category_id: sample.category_id,
-      location_id: sample.location_id,
-      categories: sample.categories,
-      categoriesShape: Array.isArray(sample.categories)
-        ? "array"
-        : sample.categories === null
-          ? "null"
-          : "object",
-      locations: sample.locations,
-      locationsShape: Array.isArray(sample.locations)
-        ? "array"
-        : sample.locations === null
-          ? "null"
-          : "object",
-    });
-  }
 
   const stats = (statsResult.data ?? []).reduce(
     (counts, item) => {
