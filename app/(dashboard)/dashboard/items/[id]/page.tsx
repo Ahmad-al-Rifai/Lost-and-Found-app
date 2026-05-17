@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { ClaimForm } from "./claim-form";
 import { ClaimReviewActions } from "./claim-review-actions";
+import { ReportForm } from "./report-form";
 
 type LookupRelation = { name: string | null } | { name: string | null }[] | null;
 
@@ -252,6 +253,7 @@ export default async function ItemDetailPage({
   const images = getSortedImages(item.item_images);
   const isFoundItem = itemType === "found";
   const isClaimable = isFoundItem && status === "open" && !isReporter;
+  const canReportItem = Boolean(currentProfile?.id && !isReporter);
 
   return (
     <div className="space-y-6">
@@ -492,6 +494,8 @@ export default async function ItemDetailPage({
               </p>
             </div>
           )}
+
+          {canReportItem ? <ReportForm itemId={item.id} /> : null}
 
           <div className="border border-green-700/20 bg-green-50 p-4 text-green-900">
             <h2 className="flex items-center gap-2 text-lg font-semibold">

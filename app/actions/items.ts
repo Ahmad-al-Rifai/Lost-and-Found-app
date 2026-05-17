@@ -19,6 +19,16 @@ export type ReviewClaimState =
   | { success: string; error?: never }
   | null;
 
+export type CreateReportState =
+  | { error: string; success?: never }
+  | { success: string; error?: never }
+  | null;
+
+export type ReviewReportState =
+  | { error: string; success?: never }
+  | { success: string; error?: never }
+  | null;
+
 function getRequiredString(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -146,9 +156,33 @@ export async function createItem(
     return { error: "Your profile could not be found. Try signing in again." };
   }
 
+  const itemId = crypto.randomUUID();
+  let uploadedImagePath: string | null = null;
+
+  if (image) {
+    const objectPath = `${profile.id}/${itemId}/${Date.now()}-${getSafeFileName(
+      image
+    )}`;
+    const { error: uploadError } = await supabase.storage
+      .from("item-images")
+      .upload(objectPath, image, {
+        contentType: image.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return {
+        error: `The image could not be uploaded: ${uploadError.message}`,
+      };
+    }
+
+    uploadedImagePath = objectPath;
+  }
+
   const { data: item, error: insertError } = await supabase
     .from("items")
     .insert({
+      id: itemId,
       reported_by: profile.id,
       category_id: categoryId,
       location_id: locationId,
@@ -162,37 +196,28 @@ export async function createItem(
     .single();
 
   if (insertError || !item) {
+    if (uploadedImagePath) {
+      await supabase.storage.from("item-images").remove([uploadedImagePath]);
+    }
+
     return { error: insertError?.message ?? "The item could not be created." };
   }
 
-  if (image) {
-    const objectPath = `${profile.id}/${item.id}/${Date.now()}-${getSafeFileName(
-      image
-    )}`;
-    const { error: uploadError } = await supabase.storage
-      .from("item-images")
-      .upload(objectPath, image, {
-        contentType: image.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      return {
-        error: `The report was created, but the image could not be uploaded: ${uploadError.message}`,
-      };
-    }
-
+  if (uploadedImagePath) {
     const { error: imageInsertError } = await supabase
       .from("item_images")
       .insert({
         item_id: item.id,
-        storage_path: objectPath,
+        storage_path: uploadedImagePath,
         is_primary: true,
       });
 
     if (imageInsertError) {
+      await supabase.from("items").delete().eq("id", item.id);
+      await supabase.storage.from("item-images").remove([uploadedImagePath]);
+
       return {
-        error: `The report was created, but the image could not be attached: ${imageInsertError.message}`,
+        error: `The image could not be attached: ${imageInsertError.message}`,
       };
     }
   }
@@ -254,6 +279,10 @@ export async function createClaim(
     return { error: "Only found items can be claimed." };
   }
 
+  if (item.status !== "open") {
+    return { error: "This item is no longer open for claims." };
+  }
+
   if (item.reported_by === profile.id) {
     return { error: "You cannot claim an item you reported." };
   }
@@ -286,6 +315,188 @@ export async function createClaim(
 
   revalidatePath(`/dashboard/items/${itemId}`);
   return { success: "Claim submitted for review." };
+}
+
+export async function createReport(
+  _prevState: CreateReportState,
+  formData: FormData
+): Promise<CreateReportState> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: "You must be signed in to report an item." };
+  }
+
+  const itemId = getRequiredString(formData, "item_id");
+  const reason = getRequiredString(formData, "reason");
+
+  if (!itemId || !isValidUuid(itemId)) {
+    return { error: "This item could not be found." };
+  }
+
+  if (!reason) {
+    return { error: "Add a short reason for the report." };
+  }
+
+  if (reason.length > 1000) {
+    return { error: "Keep the report reason under 1000 characters." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return { error: "Your profile could not be found. Try signing in again." };
+  }
+
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .select("id, reported_by")
+    .eq("id", itemId)
+    .single();
+
+  if (itemError || !item) {
+    return { error: "This item could not be found or is no longer available." };
+  }
+
+  if (item.reported_by === profile.id) {
+    return { error: "You cannot report an item you posted." };
+  }
+
+  const { data: existingReport, error: existingReportError } = await supabase
+    .from("reports")
+    .select("id")
+    .eq("item_id", item.id)
+    .eq("reporter_id", profile.id)
+    .eq("report_status", "pending")
+    .limit(1)
+    .maybeSingle();
+
+  if (existingReportError) {
+    return { error: existingReportError.message };
+  }
+
+  if (existingReport) {
+    return {
+      error: "You already have a pending report for this item.",
+    };
+  }
+
+  const { error: insertError } = await supabase.from("reports").insert({
+    reporter_id: profile.id,
+    item_id: item.id,
+    reason,
+    report_status: "pending",
+  });
+
+  if (insertError) {
+    return { error: insertError.message };
+  }
+
+  revalidatePath("/dashboard/admin");
+  revalidatePath(`/dashboard/items/${item.id}`);
+  return { success: "Report submitted for admin review." };
+}
+
+async function getAdminReportContext(reportId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: "You must be signed in to review reports." };
+  }
+
+  if (!reportId || !isValidUuid(reportId)) {
+    return { error: "This report could not be found." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (profileError || profile?.role !== "admin") {
+    return { error: "Only admins can review reports." };
+  }
+
+  const { data: report, error: reportError } = await supabase
+    .from("reports")
+    .select("id, item_id, report_status")
+    .eq("id", reportId)
+    .single();
+
+  if (reportError || !report) {
+    return { error: "This report could not be found." };
+  }
+
+  if (report.report_status !== "pending") {
+    return { error: "Only pending reports can be changed." };
+  }
+
+  return { supabase, report };
+}
+
+async function updateReportStatus(
+  reportId: string,
+  status: "reviewed" | "dismissed"
+): Promise<ReviewReportState> {
+  const context = await getAdminReportContext(reportId);
+
+  if ("error" in context) {
+    return { error: context.error ?? "Report review failed." };
+  }
+
+  const { supabase, report } = context;
+
+  const { error: updateError } = await supabase
+    .from("reports")
+    .update({ report_status: status })
+    .eq("id", report.id)
+    .eq("report_status", "pending");
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath("/dashboard/admin");
+
+  if (report.item_id && isValidUuid(report.item_id)) {
+    revalidatePath(`/dashboard/items/${report.item_id}`);
+  }
+
+  return {
+    success:
+      status === "reviewed" ? "Report marked reviewed." : "Report dismissed.",
+  };
+}
+
+export async function markReportReviewed(
+  _prevState: ReviewReportState,
+  formData: FormData
+): Promise<ReviewReportState> {
+  const reportId = getRequiredString(formData, "report_id");
+  return updateReportStatus(reportId, "reviewed");
+}
+
+export async function dismissReport(
+  _prevState: ReviewReportState,
+  formData: FormData
+): Promise<ReviewReportState> {
+  const reportId = getRequiredString(formData, "report_id");
+  return updateReportStatus(reportId, "dismissed");
 }
 
 async function getReporterClaimContext(claimId: string) {
@@ -326,7 +537,7 @@ async function getReporterClaimContext(claimId: string) {
 
   const { data: item, error: itemError } = await supabase
     .from("items")
-    .select("id, reported_by")
+    .select("id, reported_by, status")
     .eq("id", claim.item_id)
     .single();
 
@@ -336,6 +547,10 @@ async function getReporterClaimContext(claimId: string) {
 
   if (item.reported_by !== profile.id) {
     return { error: "Only the item reporter can review this claim." };
+  }
+
+  if (item.status !== "open") {
+    return { error: "Only open items can have claims reviewed." };
   }
 
   if (claim.claim_status !== "pending") {
@@ -358,33 +573,12 @@ export async function approveClaim(
 
   const { supabase, claim, item } = context;
 
-  const { error: approveError } = await supabase
-    .from("claims")
-    .update({ claim_status: "approved" })
-    .eq("id", claim.id);
+  const { error: approveError } = await supabase.rpc("approve_claim", {
+    claim_id_to_approve: claim.id,
+  });
 
   if (approveError) {
     return { error: approveError.message };
-  }
-
-  const { error: rejectOthersError } = await supabase
-    .from("claims")
-    .update({ claim_status: "rejected" })
-    .eq("item_id", item.id)
-    .eq("claim_status", "pending")
-    .neq("id", claim.id);
-
-  if (rejectOthersError) {
-    return { error: rejectOthersError.message };
-  }
-
-  const { error: itemUpdateError } = await supabase
-    .from("items")
-    .update({ status: "claimed" })
-    .eq("id", item.id);
-
-  if (itemUpdateError) {
-    return { error: itemUpdateError.message };
   }
 
   revalidatePath(`/dashboard/items/${item.id}`);

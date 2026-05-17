@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 
 import { createClient } from "@/lib/supabase/server";
+import { ReportReviewActions } from "./report-review-actions";
 
 type AdminReport = {
   id: string;
@@ -244,8 +245,8 @@ export default async function AdminPage() {
           Admin panel
         </h1>
         <p className="max-w-2xl text-base text-muted-foreground">
-          Read-only overview for access control, item activity, pending reports,
-          and pending claims.
+          Overview for access control, item activity, pending reports, and
+          pending claims.
         </p>
       </section>
 
@@ -307,6 +308,7 @@ export default async function AdminPage() {
                 const reporter = report.reporter_id
                   ? profilesById.get(report.reporter_id)
                   : null;
+                const itemTitle = item?.title || "Open item detail";
 
                 return (
                   <article
@@ -336,13 +338,18 @@ export default async function AdminPage() {
                             className="font-medium text-primary underline-offset-4 hover:underline"
                             href={`/dashboard/items/${report.item_id}`}
                           >
-                            {item?.title || "Open item detail"}
+                            {itemTitle}
                           </Link>
                         ) : (
                           "Item unavailable"
                         )}
                       </p>
                     </div>
+
+                    <ReportReviewActions
+                      reportId={report.id}
+                      itemTitle={itemTitle}
+                    />
                   </article>
                 );
               })}
@@ -428,8 +435,8 @@ export default async function AdminPage() {
       <section className="border border-amber-700/20 bg-amber-50 p-5 text-amber-900">
         <h2 className="text-lg font-semibold">Coming next</h2>
         <p className="mt-2 text-sm leading-6">
-          Sprint 3 can add report review actions, user role editing, and
-          moderation workflows once those controls are ready.
+          Sprint 3 can add deeper moderation workflows and user role editing
+          once those controls are ready.
         </p>
       </section>
     </div>
