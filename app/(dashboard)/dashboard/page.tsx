@@ -1,10 +1,6 @@
 import {
-  CalendarBlank,
-  CheckCircle,
-  Clock,
   ImageSquare,
   MagnifyingGlass,
-  MapPin,
   Plus,
   ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
@@ -296,44 +292,32 @@ export default async function DashboardPage({
   );
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-foreground md:text-4xl">
-            Find or report an item
+    <div className="space-y-5">
+      <section className="flex flex-col gap-3 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-foreground md:text-3xl">
+            Browse items
           </h1>
-          <p className="max-w-2xl text-base text-muted-foreground">
-            Search recent reports, review possible matches, and keep private
-            details protected until ownership is verified.
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Search reports by item, place, date, or status.
           </p>
         </div>
 
-        <Button id="report-item" className="h-11 w-full gap-2 lg:w-auto" asChild>
-          <Link href="/dashboard/report">
-            <Plus weight="bold" />
-            Report item
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <span className="border border-blue-700/20 bg-blue-50 px-2.5 py-1 font-medium text-blue-800">
+            {stats.open} open
+          </span>
+          <span className="border border-amber-700/20 bg-amber-50 px-2.5 py-1 font-medium text-amber-800">
+            {stats.claimed} claimed
+          </span>
+          <span className="border border-green-700/20 bg-green-50 px-2.5 py-1 font-medium text-green-800">
+            {stats.resolved} resolved
+          </span>
+        </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-4">
-        {[
-          ["Open reports", stats.open, "text-blue-700"],
-          ["Claimed", stats.claimed, "text-amber-700"],
-          ["Resolved", stats.resolved, "text-green-700"],
-          ["Visible now", items.length, "text-slate-700"],
-        ].map(([label, value, color]) => (
-          <div key={label} className="border border-border bg-card p-4">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={`mt-2 text-2xl font-semibold ${color}`}>{value}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-4">
-          <form action="/dashboard" className="border border-border bg-card p-4">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+      <form action="/dashboard" className="border border-border bg-card p-3 sm:p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_repeat(3,150px)_auto] lg:items-end">
               <label className="space-y-2">
                 <span className="text-sm font-medium text-foreground">
                   Search
@@ -352,21 +336,35 @@ export default async function DashboardPage({
 
               <label className="space-y-2">
                 <span className="text-sm font-medium text-foreground">
-                  Sort
+                  Type
                 </span>
                 <select
-                  name="sort"
-                  defaultValue={filters.sort}
+                  name="type"
+                  defaultValue={filters.type}
                   className="h-11 w-full border border-input bg-background px-3 text-base outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                 >
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                  <option value="date">Item date</option>
+                  <option value="">Lost or found</option>
+                  <option value="lost">Lost</option>
+                  <option value="found">Found</option>
                 </select>
               </label>
-            </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">
+                  Status
+                </span>
+                <select
+                  name="status"
+                  defaultValue={filters.status}
+                  className="h-11 w-full border border-input bg-background px-3 text-base outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                >
+                  <option value="">Any status</option>
+                  <option value="open">Open</option>
+                  <option value="claimed">Claimed</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </label>
+
               <label className="space-y-2">
                 <span className="text-sm font-medium text-foreground">
                   Category
@@ -385,6 +383,22 @@ export default async function DashboardPage({
                 </select>
               </label>
 
+              <div className="flex gap-2">
+                <Button type="submit" className="h-11 flex-1 gap-2 lg:flex-none">
+                  <MagnifyingGlass weight="bold" />
+                  Search
+                </Button>
+                <Button variant="outline" className="h-11 flex-1 lg:flex-none" asChild>
+                  <a href="/dashboard">Reset</a>
+                </Button>
+              </div>
+        </div>
+
+        <details className="mt-3 border-t border-border pt-3">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+            More filters
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-2">
                 <span className="text-sm font-medium text-foreground">
                   Location
@@ -421,46 +435,21 @@ export default async function DashboardPage({
 
               <label className="space-y-2">
                 <span className="text-sm font-medium text-foreground">
-                  Type
+                  Sort
                 </span>
                 <select
-                  name="type"
-                  defaultValue={filters.type}
+                  name="sort"
+                  defaultValue={filters.sort}
                   className="h-11 w-full border border-input bg-background px-3 text-base outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                 >
-                  <option value="">Lost or found</option>
-                  <option value="lost">Lost</option>
-                  <option value="found">Found</option>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="date">Item date</option>
                 </select>
               </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-foreground">
-                  Status
-                </span>
-                <select
-                  name="status"
-                  defaultValue={filters.status}
-                  className="h-11 w-full border border-input bg-background px-3 text-base outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-                >
-                  <option value="">Any status</option>
-                  <option value="open">Open</option>
-                  <option value="claimed">Claimed</option>
-                  <option value="resolved">Resolved</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="submit" className="h-10 gap-2">
-                <MagnifyingGlass weight="bold" />
-                Search listings
-              </Button>
-              <Button variant="outline" className="h-10" asChild>
-                <a href="/dashboard">Clear filters</a>
-              </Button>
-            </div>
-          </form>
+          </div>
+        </details>
+      </form>
 
           {error ? (
             <div className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -476,7 +465,19 @@ export default async function DashboardPage({
             </div>
           ) : null}
 
-          <div className="space-y-3">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-foreground">
+            {items.length} visible report{items.length === 1 ? "" : "s"}
+          </h2>
+          <Button id="report-item" className="h-9 gap-2" asChild>
+            <Link href="/dashboard/report">
+              <Plus weight="bold" />
+              Report item
+            </Link>
+          </Button>
+        </div>
+
             {items.length > 0 ? (
               items.map((item) => {
                 const categoryName =
@@ -504,7 +505,7 @@ export default async function DashboardPage({
                 return (
                   <article
                     key={item.id}
-                    className="grid gap-4 border border-border bg-card p-4 transition hover:border-primary/40 sm:grid-cols-[112px_1fr]"
+                    className="grid gap-3 border border-border bg-card p-3 transition hover:border-primary/40 sm:grid-cols-[96px_1fr] sm:p-4"
                   >
                     <div className="flex aspect-square items-center justify-center overflow-hidden border border-border bg-muted text-sm font-medium text-muted-foreground">
                       {imageUrl ? (
@@ -523,17 +524,17 @@ export default async function DashboardPage({
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0 space-y-3">
+                    <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <h2 className="text-lg font-semibold text-foreground">
+                          <h3 className="text-base font-semibold text-foreground">
                             <Link
                               href={`/dashboard/items/${item.id}`}
                               className="underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                             >
                               {item.title ?? "Untitled item"}
                             </Link>
-                          </h2>
+                          </h3>
                           <p className="text-sm text-muted-foreground">
                             {locationName} - {formatDate(item.date_lost_found)}
                           </p>
@@ -553,7 +554,7 @@ export default async function DashboardPage({
                           </span>
                         </div>
                       </div>
-                      <p className="text-sm text-foreground">
+                      <p className="line-clamp-2 text-sm text-foreground">
                         {item.description ?? "No public description provided."}
                       </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -579,42 +580,6 @@ export default async function DashboardPage({
                 </Button>
               </div>
             )}
-          </div>
-        </div>
-
-        <aside className="space-y-4">
-          <div className="border border-border bg-card p-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Location context
-            </h2>
-            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <p className="flex gap-2">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
-                Browse by university location to narrow results faster.
-              </p>
-              <p className="flex gap-2">
-                <CalendarBlank className="mt-0.5 size-4 shrink-0 text-primary" />
-                Check recent reports first before broadening the date filter.
-              </p>
-              <p className="flex gap-2">
-                <Clock className="mt-0.5 size-4 shrink-0 text-amber-700" />
-                Claimed items still need verification before contact details
-                appear.
-              </p>
-            </div>
-          </div>
-
-          <div className="border border-green-700/20 bg-green-50 p-4 text-green-900">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <CheckCircle className="size-5" />
-              Trust and safety
-            </h2>
-            <p className="mt-2 text-sm">
-              Ask for a detail only the owner would know before marking an item
-              as returned.
-            </p>
-          </div>
-        </aside>
       </section>
     </div>
   );

@@ -4,7 +4,6 @@ import {
   ClipboardText,
   Flag,
   ShieldCheck,
-  Users,
 } from "@phosphor-icons/react/dist/ssr";
 
 import { createClient } from "@/lib/supabase/server";
@@ -182,72 +181,56 @@ export default async function AdminPage() {
 
   const stats = [
     {
-      label: "Total users",
+      label: "Users",
       value: countValue(totalUsersResult.count),
-      description: "Profiles in the system",
-      icon: Users,
-    },
-    {
-      label: "Active users",
-      value: countValue(activeUsersResult.count),
-      description: "Profiles with active status",
+      description: `${countValue(activeUsersResult.count)} active, ${countValue(
+        blockedUsersResult.count,
+      )} blocked`,
       icon: ShieldCheck,
     },
     {
-      label: "Blocked users",
-      value: countValue(blockedUsersResult.count),
-      description: "Profiles blocked by policy",
-      icon: ShieldCheck,
-    },
-    {
-      label: "Total items",
+      label: "Items",
       value: countValue(totalItemsResult.count),
-      description: "Lost and found reports",
+      description: `${countValue(openItemsResult.count)} open, ${countValue(
+        resolvedItemsResult.count,
+      )} resolved`,
       icon: ClipboardText,
     },
     {
-      label: "Open items",
-      value: countValue(openItemsResult.count),
-      description: "Available for browsing",
-      icon: ClipboardText,
-    },
-    {
-      label: "Claimed items",
-      value: countValue(claimedItemsResult.count),
-      description: "Claim flow in progress",
-      icon: ClipboardText,
-    },
-    {
-      label: "Resolved items",
-      value: countValue(resolvedItemsResult.count),
-      description: "Returned or closed items",
-      icon: ClipboardText,
-    },
-    {
-      label: "Pending claims",
+      label: "Claims",
       value: countValue(pendingClaimsCountResult.count),
-      description: "Waiting for review",
+      description: `${countValue(claimedItemsResult.count)} items in claim flow`,
       icon: ChartBar,
     },
     {
-      label: "Pending reports",
+      label: "Reports",
       value: countValue(pendingReportsCountResult.count),
-      description: "Flagged items to review",
+      description: "Flags waiting for admin review",
       icon: Flag,
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <p className="text-sm font-medium text-primary">Admin</p>
-        <h1 className="text-3xl font-semibold text-foreground md:text-4xl">
-          Admin panel
-        </h1>
-        <p className="max-w-2xl text-base text-muted-foreground">
-          Overview for access control, item activity, pending reports, and
-          pending claims.
-        </p>
+    <div className="space-y-5">
+      <section className="flex flex-col gap-3 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-primary">Admin</p>
+          <h1 className="text-2xl font-semibold text-foreground md:text-3xl">
+            Moderation queue
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Review pending reports first, then follow up on claim activity.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-sm">
+          <span className="border border-amber-700/20 bg-amber-50 px-2.5 py-1 font-medium text-amber-900">
+            {countValue(pendingReportsCountResult.count)} reports
+          </span>
+          <span className="border border-blue-700/20 bg-blue-50 px-2.5 py-1 font-medium text-blue-800">
+            {countValue(pendingClaimsCountResult.count)} claims
+          </span>
+        </div>
       </section>
 
       {loadError ? (
@@ -257,27 +240,27 @@ export default async function AdminPage() {
         </section>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
 
           return (
             <article
               key={stat.label}
-              className="border border-border bg-card p-4"
+              className="border border-border bg-card p-3"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
                     {stat.label}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
+                  <p className="mt-1 text-2xl font-semibold text-foreground">
                     {stat.value}
                   </p>
                 </div>
-                <Icon className="size-6 text-primary" />
+                <Icon className="size-5 text-primary" />
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {stat.description}
               </p>
             </article>
@@ -285,22 +268,22 @@ export default async function AdminPage() {
         })}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="border border-border bg-card p-5">
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Recent pending reports
+              <h2 className="text-base font-semibold text-foreground">
+                Pending reports
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                User-submitted flags waiting for admin review.
+              <p className="text-sm text-muted-foreground">
+                User-submitted flags that need a decision.
               </p>
             </div>
-            <Flag className="size-6 text-primary" />
+            <Flag className="size-5 text-primary" />
           </div>
 
           {recentReports.length ? (
-            <div className="mt-5 space-y-3">
+            <div className="space-y-3">
               {recentReports.map((report) => {
                 const item = report.item_id
                   ? itemsById.get(report.item_id)
@@ -313,11 +296,11 @@ export default async function AdminPage() {
                 return (
                   <article
                     key={report.id}
-                    className="border border-border bg-background p-4"
+                    className="border border-border bg-card p-4"
                   >
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="border border-amber-700/20 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
-                        Pending report
+                        Pending
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatDateTime(report.created_at)}
@@ -326,12 +309,9 @@ export default async function AdminPage() {
                     <p className="mt-3 break-words text-sm font-medium text-foreground">
                       {report.reason || "No reason provided"}
                     </p>
-                    <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                      <p>
-                        Reporter:{" "}
-                        {reporter?.full_name || "Reporter unavailable"}
-                      </p>
-                      <p>
+                    <div className="mt-3 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+                      <p>Reporter: {reporter?.full_name || "Unavailable"}</p>
+                      <p className="min-w-0">
                         Item:{" "}
                         {report.item_id ? (
                           <Link
@@ -355,27 +335,27 @@ export default async function AdminPage() {
               })}
             </div>
           ) : (
-            <div className="mt-5 border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+            <div className="border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
               No pending reports.
             </div>
           )}
         </div>
 
-        <div className="border border-border bg-card p-5">
+        <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Recent pending claims
+              <h2 className="text-base font-semibold text-foreground">
+                Pending claims
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Claim requests waiting for reporter review.
+              <p className="text-sm text-muted-foreground">
+                Recent ownership requests from students.
               </p>
             </div>
-            <ChartBar className="size-6 text-primary" />
+            <ChartBar className="size-5 text-primary" />
           </div>
 
           {recentClaims.length ? (
-            <div className="mt-5 space-y-3">
+            <div className="space-y-3">
               {recentClaims.map((claim) => {
                 const item = claim.item_id
                   ? itemsById.get(claim.item_id)
@@ -387,11 +367,11 @@ export default async function AdminPage() {
                 return (
                   <article
                     key={claim.id}
-                    className="border border-border bg-background p-4"
+                    className="border border-border bg-card p-4"
                   >
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="border border-amber-700/20 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
-                        Pending claim
+                        Pending
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatDateTime(claim.created_at)}
@@ -402,10 +382,7 @@ export default async function AdminPage() {
                         "No verification answer provided"}
                     </p>
                     <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                      <p>
-                        Claimant:{" "}
-                        {claimant?.full_name || "Claimant unavailable"}
-                      </p>
+                      <p>Claimant: {claimant?.full_name || "Unavailable"}</p>
                       <p>
                         Item:{" "}
                         {claim.item_id ? (
@@ -425,19 +402,11 @@ export default async function AdminPage() {
               })}
             </div>
           ) : (
-            <div className="mt-5 border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+            <div className="border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
               No pending claims.
             </div>
           )}
         </div>
-      </section>
-
-      <section className="border border-amber-700/20 bg-amber-50 p-5 text-amber-900">
-        <h2 className="text-lg font-semibold">Coming next</h2>
-        <p className="mt-2 text-sm leading-6">
-          Sprint 3 can add deeper moderation workflows and user role editing
-          once those controls are ready.
-        </p>
       </section>
     </div>
   );
